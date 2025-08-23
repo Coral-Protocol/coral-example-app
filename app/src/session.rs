@@ -26,10 +26,10 @@ impl<'a> Session<'a> {
 
     fn agents(&self) -> Vec<AgentDefinition> {
         vec![
-            AgentDefinition {
-                name: "context".to_string(),
-                options: HashMap::new(),
-            },
+            // AgentDefinition {
+            //     name: "context".to_string(),
+            //     options: HashMap::new(),
+            // },
             AgentDefinition {
                 name: "discord".to_string(),
                 options: HashMap::from([
