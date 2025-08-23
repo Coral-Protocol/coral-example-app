@@ -44,7 +44,7 @@ pub struct ThreadRespondToolOutput {
 }
 
 impl Tool for ThreadRespondTool {
-    const NAME: &'static str = "respond";
+    const NAME: &'static str = "send_discord_message";
     type Error = ResponseError;
     type Args = Args;
     type Output = ThreadRespondToolOutput;
@@ -54,7 +54,7 @@ impl Tool for ThreadRespondTool {
 
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Responds to the support thread.  This tool must be used to communicate with ".to_string(),
+            description: "Sends a message to the Discord thread.".to_string(),
             parameters,
         }
     }
