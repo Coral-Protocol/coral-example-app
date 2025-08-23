@@ -8,7 +8,7 @@ use serenity::prelude::TypeMapKey;
 use serenity::{async_trait, Client};
 use std::sync::{Arc};
 use coral_rs::api::generated::types::RouteException;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -20,6 +20,10 @@ struct Arguments {
     /// The discord API token
     #[arg(short, long, env = "DISCORD_API_TOKEN")]
     discord_api_token: String,
+
+    /// The OpenAI API key
+    #[arg(short, long, env = "OPENAI_API_KEY")]
+    openai_api_key: String,
 }
 
 struct Handler;

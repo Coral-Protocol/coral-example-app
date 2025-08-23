@@ -34,7 +34,8 @@ impl<'a> Session<'a> {
                 name: "discord".to_string(),
                 options: HashMap::from([
                     ("DISCORD_API_TOKEN".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone())),
-                    ("DISCORD_THREAD_ID".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone()))
+                    ("OPENAI_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openai_api_key.clone())),
+                    ("DISCORD_THREAD_ID".to_string(), AgentOptionValue::String(self.channel_id.clone()))
                 ]),
             },
         ]
