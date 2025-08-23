@@ -60,7 +60,7 @@ async fn main() {
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(&args.discord_api_token, intents)
+    let mut client = Client::builder(&args.api_token, intents)
         .event_handler(ThreadEventHandler)
         .await
         .expect("Error creating discord client");
