@@ -1,9 +1,11 @@
 [agent]
 name = "discord"
 version = "0.1.0"
-description = "ahh"
+description = "A support agent tasked with one Discord support thread, responsible for all communication with the user"
 
 [options]
+DISCORD_API_TOKEN = { type = "string", description = "Discord API token", required = true }
+DISCORD_THREAD_ID = { type = "string", description = "The ID of the thread to watch", required = true }
 
 [runtimes.executable]
 command = ["target/release/discord.exe"]
