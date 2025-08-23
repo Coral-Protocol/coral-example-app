@@ -1,0 +1,9 @@
+[agent]
+name = "discord"
+version = "0.1.0"
+description = "ahh"
+
+[options]
+
+[runtimes.executable]
+command = ["target/release/discord.exe"]

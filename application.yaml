@@ -1,0 +1,6 @@
+applications:
+  - id: coral-example-app
+    name: "Coral Example App"
+    description: "An example app for Coral"
+    privacyKeys:
+      - "private"

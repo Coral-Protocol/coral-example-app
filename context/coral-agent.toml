@@ -1,0 +1,8 @@
+[agent]
+name = "context"
+version = "0.1.0"
+
+[options]
+
+[runtimes.executable]
+command = ["target/release/context.exe"]
