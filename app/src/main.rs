@@ -1,13 +1,15 @@
 mod session;
 
+use std::collections::HashSet;
 use crate::session::Session;
 use clap::{Parser};
 use coral_rs::api::generated::{Error, ResponseValue};
-use serenity::all::{Context, EventHandler, GatewayIntents, GuildChannel, Ready};
+use serenity::all::{ChannelId, Context, EventHandler, GatewayIntents, GuildChannel, Ready};
 use serenity::prelude::TypeMapKey;
 use serenity::{async_trait, Client};
 use std::sync::{Arc};
 use coral_rs::api::generated::types::RouteException;
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
 #[derive(Parser, Debug)]
@@ -40,6 +42,17 @@ impl EventHandler for Handler {
         let arguments = data
             .get::<Arguments>()
             .unwrap();
+
+        {
+            let watchlist = data
+                .get::<Watchlist>()
+                .unwrap();
+
+            // Watchlist already contained thread ID
+            if !watchlist.lock().await.insert(thread.id) {
+                return;
+            }
+        }
 
         let session = Session::new(
             &arguments,
@@ -83,6 +96,12 @@ impl TypeMapKey for Arguments {
     type Value = Arc<Self>;
 }
 
+struct Watchlist;
+
+impl TypeMapKey for Watchlist {
+    type Value = Mutex<HashSet<ChannelId>>;
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -100,6 +119,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<Arguments>(Arc::new(args));
+        data.insert::<Watchlist>(Mutex::new(HashSet::new()));
     }
 
     client
