@@ -41,7 +41,7 @@ use crate::discord::tools::ThreadRespondTool;
 struct Arguments {
     /// The discord API token
     #[arg(short, long, env = "DISCORD_API_TOKEN")]
-    discord_api_token: String,
+    api_token: String,
 
     /// The target thread to provide support in
     #[arg(short, long, env = "DISCORD_THREAD_ID")]
