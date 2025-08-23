@@ -374,6 +374,7 @@ name = "coral-rs"
 version = "0.1.1"
 dependencies = [
  "futures",
+ "prettyplease",
  "progenitor",
  "progenitor-client",
  "reqwest 0.12.23",
@@ -381,6 +382,7 @@ dependencies = [
  "rmcp",
  "serde",
  "serde_json",
+ "syn 2.0.106",
  "thiserror 2.0.16",
  "tokio",
  "tracing",
@@ -932,10 +934,6 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
-
-[[package]]
-name = "human"
-version = "0.1.0"
 
 [[package]]
 name = "hyper"
@@ -1618,6 +1616,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "prettyplease"
+version = "0.2.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -2529,10 +2537,6 @@ checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
 ]
-
-[[package]]
-name = "shared"
-version = "0.1.0"
 
 [[package]]
 name = "shlex"

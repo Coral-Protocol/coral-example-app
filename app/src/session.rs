@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use coral_rs::api::{Client, Error, ResponseValue};
-use coral_rs::api::types::{AgentGraphRequest, AgentOptionValue, CreateSessionRequest, CreateSessionResponse, GraphAgentProvider, GraphAgentRequest, RuntimeId};
+use coral_rs::api::generated::{Client, Error, ResponseValue};
+use coral_rs::api::generated::types::{AgentGraphRequest, AgentOptionValue, CreateSessionRequest, CreateSessionResponse, GraphAgentProvider, GraphAgentRequest, RouteException, RuntimeId};
 use crate::Arguments;
 
 struct AgentDefinition {
@@ -10,19 +10,16 @@ struct AgentDefinition {
 
 pub struct Session<'a> {
     arguments: &'a Arguments,
-    thread_id: String,
     channel_id: String,
 }
 
 impl<'a> Session<'a> {
     pub fn new(
         arguments: &'a Arguments,
-        thread_id: String,
         channel_id: String,
     ) -> Self {
         Self {
             arguments,
-            thread_id,
             channel_id,
         }
     }
@@ -35,22 +32,15 @@ impl<'a> Session<'a> {
             },
             AgentDefinition {
                 name: "discord".to_string(),
-                options: HashMap::from([(
-                        "DISCORD_API_TOKEN".to_string(),
-                        AgentOptionValue::String(self.arguments.discord_api_token.clone())
-                    ), (
-                        "DISCORD_CHANNEL_ID".to_string(),
-                        AgentOptionValue::String(self.channel_id.clone())
-                    ), (
-                        "DISCORD_THREAD_ID".to_string(),
-                        AgentOptionValue::String(self.thread_id.clone())
-                    ),
+                options: HashMap::from([
+                    ("DISCORD_API_TOKEN".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone())),
+                    ("DISCORD_THREAD_ID".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone()))
                 ]),
             },
         ]
     }
 
-    pub async fn execute(&self) -> Result<ResponseValue<CreateSessionResponse>, Error> {
+    pub async fn execute(&self) -> Result<ResponseValue<CreateSessionResponse>, Error<RouteException>> {
         let agents = self.agents();
         Client::new(self.arguments.coral_server.as_str())
             .create_session(&CreateSessionRequest {
@@ -61,10 +51,11 @@ impl<'a> Session<'a> {
                             (agent.name.clone(), GraphAgentRequest {
                                 agent_name: agent.name.clone(),
                                 blocking: Some(true),
-                                options: Default::default(),
+                                options: agent.options.clone(),
                                 provider: GraphAgentProvider::Local {
                                     runtime: RuntimeId::Executable,
                                 },
+                                system_prompt: None,
                                 tools: vec![],
                             })
                         })

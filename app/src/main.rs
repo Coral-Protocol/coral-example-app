@@ -2,11 +2,12 @@ mod session;
 
 use crate::session::Session;
 use clap::{Parser};
-use coral_rs::api::Error;
-use serenity::all::{Context, EventHandler, GatewayIntents, GuildChannel, Message, Ready};
+use coral_rs::api::generated::{Error, ResponseValue};
+use serenity::all::{Context, EventHandler, GatewayIntents, GuildChannel, Ready};
 use serenity::prelude::TypeMapKey;
 use serenity::{async_trait, Client};
 use std::sync::{Arc};
+use coral_rs::api::generated::types::RouteException;
 use tracing::{error, info, warn};
 
 #[derive(Parser, Debug)]
@@ -36,18 +37,9 @@ impl EventHandler for Handler {
             .get::<Arguments>()
             .unwrap();
 
-        let channel_id = match thread.parent_id {
-            None => {
-                warn!("received thread_create event for a thread without an ID!");
-                return;
-            }
-            Some(channel_id) => channel_id.to_string()
-        };
-
         let session = Session::new(
             &arguments,
-            thread.id.to_string(),
-            channel_id,
+            thread.id.to_string()
         );
 
         match session.execute().await {
@@ -67,7 +59,16 @@ impl EventHandler for Handler {
                                 error!("received unexpected which could not be parsed: {e}"),
                         }
                     }
-                    _ => error!("error: {:?}", e),
+                    Error::ErrorResponse(e) => {
+                        let status = e.status();
+                        let exception: RouteException = ResponseValue::into_inner(e);
+                        error!("{status}: {}", exception.message.unwrap_or_else(|| "no message".to_string()));
+                        error!("Stack trace: ");
+                        for (i, stack) in exception.stack_trace.iter().enumerate() {
+                            error!("{i}. {stack}");
+                        }
+                    }
+                    _ => error!("{e:#?}"),
                 }
             }
         }
