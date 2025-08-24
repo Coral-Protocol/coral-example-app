@@ -6,6 +6,8 @@ description = "A support agent tasked with one Discord support thread, responsib
 [options]
 DISCORD_API_TOKEN = { type = "string", description = "Discord API token", required = true }
 DISCORD_THREAD_ID = { type = "string", description = "The ID of the thread to watch", required = true }
+DISCORD_TIMEOUT_WARNING = { type = "string", description = "The amount of time before a warning issuing a warning to the user that the thread will timeout.  Format is https://docs.rs/humantime/2.2.0/humantime/", default = "30m" }
+DISCORD_TIMEOUT = { type = "string", description = "After the timeout warning has occurred, the thread will close in this amount of time.  Format is https://docs.rs/humantime/2.2.0/humantime/", default = "30m" }
 OPENAI_API_KEY = { type = "string", description = "An API key for OpenAI", required = true }
 
 [runtimes.executable]

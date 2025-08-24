@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use coral_rs::api::generated::{Client, Error, ResponseValue};
 use coral_rs::api::generated::types::{AgentGraphRequest, AgentOptionValue, CreateSessionRequest, CreateSessionResponse, GraphAgentProvider, GraphAgentRequest, RouteException, RuntimeId};
+use humantime::format_duration;
 use crate::Arguments;
 
 struct AgentDefinition {
@@ -25,6 +26,22 @@ impl<'a> Session<'a> {
     }
 
     fn agents(&self) -> Vec<AgentDefinition> {
+        let mut discord_options = HashMap::from([
+            ("DISCORD_API_TOKEN".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone())),
+            ("OPENAI_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openai_api_key.clone())),
+            ("DISCORD_THREAD_ID".to_string(), AgentOptionValue::String(self.channel_id.clone()))
+        ]);
+
+        if let Some(timeout) = self.arguments.timeout_duration_warning {
+            discord_options.insert("DISCORD_TIMEOUT_WARNING".to_string(),
+                                   AgentOptionValue::String(format_duration(timeout.into()).to_string()));
+        }
+
+        if let Some(timeout) = self.arguments.timeout_duration {
+            discord_options.insert("DISCORD_TIMEOUT_WARNING".to_string(),
+                                   AgentOptionValue::String(format_duration(timeout.into()).to_string()));
+        }
+
         vec![
             // AgentDefinition {
             //     name: "context".to_string(),
@@ -32,11 +49,7 @@ impl<'a> Session<'a> {
             // },
             AgentDefinition {
                 name: "discord".to_string(),
-                options: HashMap::from([
-                    ("DISCORD_API_TOKEN".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone())),
-                    ("OPENAI_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openai_api_key.clone())),
-                    ("DISCORD_THREAD_ID".to_string(), AgentOptionValue::String(self.channel_id.clone()))
-                ]),
+                options: discord_options,
             },
         ]
     }

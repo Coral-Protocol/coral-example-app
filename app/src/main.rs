@@ -16,15 +16,24 @@ use tracing::{error, info};
 #[command(version, about, long_about = None)]
 struct Arguments {
     /// The address of the Coral server
-    #[arg(short, long, default_value = "http://localhost:5555", env = "CORAL_SERVER")]
+    #[arg(long, default_value = "http://localhost:5555", env = "CORAL_SERVER")]
     coral_server: String,
 
     /// The discord API token
-    #[arg(short, long, env = "DISCORD_API_TOKEN")]
+    #[arg(long, env = "DISCORD_API_TOKEN")]
     discord_api_token: String,
 
+    /// The amount of time before sending a timeout warning
+    #[arg(long, env = "DISCORD_TIMEOUT_WARNING")]
+    timeout_duration_warning: Option<humantime::Duration>,
+
+    /// The amount of time to wait before timing out the support thread.  This is in addition to
+    /// the warning time
+    #[arg(long, env = "DISCORD_TIMEOUT")]
+    timeout_duration: Option<humantime::Duration>,
+
     /// The OpenAI API key
-    #[arg(short, long, env = "OPENAI_API_KEY")]
+    #[arg(long, env = "OPENAI_API_KEY")]
     openai_api_key: String,
 }
 

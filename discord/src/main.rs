@@ -1,8 +1,10 @@
 mod discord;
+mod timeout;
 
 use std::sync::Arc;
 use crate::discord::thread_watcher::{ShardManagerContainer, ThreadEventHandler, ThreadWatcher};
 use clap::{arg, Parser};
+use const_format::formatcp;
 use coral_rs::agent::Agent;
 use coral_rs::agent_loop::AgentLoop;
 use coral_rs::mcp_server::McpConnectionBuilder;
@@ -10,13 +12,16 @@ use coral_rs::rig::client::{CompletionClient, ProviderClient};
 use coral_rs::rig::providers::openai;
 use coral_rs::rig::providers::openai::GPT_4_1_MINI;
 use coral_rs::telemetry::TelemetryMode;
-use futures::{pin_mut, stream};
+use futures::stream;
 use serenity::all::{ChannelId, GatewayIntents, GetMessages};
 use serenity::Client;
+use tokio::select;
 use tracing::error;
+use tracing::log::info;
 use crate::discord::thread_message::ThreadMessage;
+use crate::discord::tools::THREAD_RESPOND_T0OL_NAME;
 
-const PROMPT: &'static str = r#"
+const PROMPT: &'static str = formatcp!(r#"
 You are a Coral agent.  A Disord support thread was created by a user.  You must provide support to the user.
 
 === Coral agent rules ===
@@ -31,21 +36,31 @@ You are a Coral agent.  A Disord support thread was created by a user.  You must
 
 === Support rules ===
 1. If it seems like the user has not finished asking their question, do not respond.
-2. You must use the "respond" tool to respond to the user's question.  No other messages can be seen by the user.
-"#;
+2. You must use the "{THREAD_RESPOND_T0OL_NAME}" tool to respond to the user's question.  No other messages can be seen by the user.
+"#);
 
 use crate::discord::tools::ThreadRespondTool;
+use crate::timeout::Timeout;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Arguments {
     /// The discord API token
-    #[arg(short, long, env = "DISCORD_API_TOKEN")]
+    #[arg(long, env = "DISCORD_API_TOKEN")]
     api_token: String,
 
     /// The target thread to provide support in
-    #[arg(short, long, env = "DISCORD_THREAD_ID")]
+    #[arg(long, env = "DISCORD_THREAD_ID")]
     thread_id: ChannelId,
+
+    /// The amount of time before sending a timeout warning
+    #[arg(long, env = "DISCORD_TIMEOUT_WARNING")]
+    timeout_duration_warning: humantime::Duration,
+
+    /// The amount of time to wait before timing out the support thread.  This is in addition to
+    /// the warning time
+    #[arg(long, env = "DISCORD_TIMEOUT")]
+    timeout_duration: humantime::Duration,
 }
 
 #[tokio::main]
@@ -83,7 +98,14 @@ async fn main() {
         panic!("The specified thread is archived or locked");
     }
 
-    let watcher = Arc::new(ThreadWatcher::new(channel.clone()));
+    let timeout = Arc::new(Timeout::new(
+        args.timeout_duration_warning.into(),
+        args.timeout_duration.into(),
+        client.http.clone(),
+        channel.clone(),
+    ));
+
+    let watcher = Arc::new(ThreadWatcher::new(channel.clone(), timeout.clone()));
     {
         let mut data = client.data.write().await;
         data.insert::<ThreadWatcher>(watcher.clone());
@@ -161,10 +183,17 @@ async fn main() {
     let agent_handle = AgentLoop::new(agent, prompt_stream)
         .execute();
 
-    pin_mut!(agent_handle);
-    pin_mut!(discord_handle);
+    let timeout_handle = timeout.run();
 
-    // The Discord thread will exit when the thread closes, the agent (and by extension this
-    // application) should exit in this case.
-    let _ = futures::future::select(discord_handle, agent_handle).await;
+    select! {
+        _ = agent_handle => {
+            info!("Agent thread exited")
+        },
+        _ = discord_handle => {
+            info!("Discord thread exited")
+        },
+        _ = timeout_handle => {
+            info!("Timeout reached")
+        }
+    }
 }

@@ -8,11 +8,13 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::{mpsc, Mutex};
 use tracing::{error, info, warn};
 use crate::discord::thread_message::ThreadMessage;
+use crate::timeout::Timeout;
 
 pub struct ThreadWatcher {
     channel: GuildChannel,
     pub sender: Arc<Mutex<UnboundedSender<ThreadMessage>>>,
-    pub receiver: Arc<Mutex<UnboundedReceiver<ThreadMessage>>>
+    pub receiver: Arc<Mutex<UnboundedReceiver<ThreadMessage>>>,
+    timeout: Arc<Timeout>
 }
 
 pub struct ThreadEventHandler;
@@ -43,6 +45,11 @@ impl EventHandler for ThreadEventHandler {
             if let Err(e) = sender.send(message.into()) {
                 error!("Could not send message from collector to MPSC channel: {e}");
                 shard_manager.shutdown_all().await;
+            }
+            else {
+                if let Err(e) = watcher.timeout.reset().await {
+                    warn!("Timeout could not be reset!: {e}");
+                }
             }
         }
     }
@@ -107,12 +114,13 @@ impl TypeMapKey for ThreadWatcher {
 }
 
 impl ThreadWatcher {
-    pub fn new(channel: GuildChannel) -> Self {
+    pub fn new(channel: GuildChannel, timeout: Arc<Timeout>) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         Self {
             channel,
             sender: Arc::new(tx.into()),
             receiver: Arc::new(rx.into()),
+            timeout
         }
     }
 }
