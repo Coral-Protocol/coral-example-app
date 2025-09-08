@@ -1,5 +1,6 @@
-[[index-agent]]
-path = "ca-context7"
+[[indexed-agent]]
+name = "ca-context7"
+versions = ["0.1.0"]
 
 [[local-agent]]
 path = "discord"
