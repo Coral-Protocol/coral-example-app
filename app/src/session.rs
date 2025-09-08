@@ -60,7 +60,7 @@ impl<'a> Session<'a> {
             custom_tool_access: vec![],
             description: Some("An agent with access to all the Coral documentation".to_string()),
             id: AgentRegistryIdentifier {
-                name: "context7".to_string(),
+                name: "ca-context7".to_string(),
                 version: "0.1.0".to_string(),
             },
             name: "ctx-coral".to_string(),

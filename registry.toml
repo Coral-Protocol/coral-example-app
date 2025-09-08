@@ -1,5 +1,5 @@
-[agent-import]
-context = { path = "context" }
-discord = { path = "discord" }
+[[index-agent]]
+path = "ca-context7"
 
-[agent-export]
+[[local-agent]]
+path = "discord"
