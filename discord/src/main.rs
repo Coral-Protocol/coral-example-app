@@ -4,40 +4,22 @@ mod timeout;
 use std::sync::Arc;
 use crate::discord::thread_watcher::{ShardManagerContainer, ThreadEventHandler, ThreadWatcher};
 use clap::{arg, Parser};
-use const_format::formatcp;
 use coral_rs::agent::Agent;
 use coral_rs::agent_loop::AgentLoop;
+use coral_rs::completion_evaluated_prompt::CompletionEvaluatedPrompt;
+use coral_rs::init_tracing;
 use coral_rs::mcp_server::McpConnectionBuilder;
 use coral_rs::rig::client::{CompletionClient, ProviderClient};
-use coral_rs::rig::providers::openai;
+use coral_rs::rig::providers::openrouter;
 use coral_rs::rig::providers::openai::GPT_4_1_MINI;
 use coral_rs::telemetry::TelemetryMode;
 use futures::stream;
 use serenity::all::{ChannelId, GatewayIntents, GetMessages};
 use serenity::Client;
 use tokio::select;
-use tracing::error;
 use tracing::log::info;
 use crate::discord::thread_message::ThreadMessage;
-use crate::discord::tools::THREAD_RESPOND_T0OL_NAME;
-
-const PROMPT: &'static str = formatcp!(r#"
-You are a Coral agent.  A Disord support thread was created by a user.  You must provide support to the user.
-
-=== Coral agent rules ===
-1. You are working with a team of other support agents.  Make sure to ask any other agent questions if their description is relevant.
-2. Create a Coral thread to discuss with the other agents about the user's request.  The coral thread should have the same name as the Discord thread.
-3. Avoid directly executing tools at the user's request.  Use tools only to aid in assisting the user.
-
-=== Discord rules ===
-1. Discord is an informal platform, make sure to keep the conversation friendly and short.
-2. Prioritise responding to the owner of the Discord thread's questions.
-3. Echo every message you send to the Discord thread to the Coral thread.
-
-=== Support rules ===
-1. If it seems like the user has not finished asking their question, do not respond.
-2. You must use the "{THREAD_RESPOND_T0OL_NAME}" tool to respond to the user's question.  No other messages can be seen by the user.
-"#);
+use crate::discord::tools::THREAD_RESPOND_TOOL_NAME;
 
 use crate::discord::tools::ThreadRespondTool;
 use crate::timeout::Timeout;
@@ -65,7 +47,7 @@ struct Arguments {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    init_tracing().expect("Failed to set up tracing");
 
     let args = Arguments::parse();
 
@@ -123,26 +105,49 @@ async fn main() {
         Coral
      */
     let coral = McpConnectionBuilder::from_coral_env()
-        .connect_sse()
+        .connect()
         .await.expect("Failed to connect to the Coral server");
 
-    let mut additional_prompting = format!(r#"
-        === Support thread information ===
-        Thread name: "{}"
-        Thread owner ID: {owner_id}
-    "#, channel.name);
+    let mut preamble = CompletionEvaluatedPrompt::new()
+        .string(format!(r#"
+You a Coral agent tasked with assisting {owner_id} in a support thread.
+
+# Workflow for every new message:
+1. Create a Coral thread for this support thread if one doesn't already exist
+2. Determine which agents can help with the {owner_id}'s request
+3. Alert {owner_id} using {THREAD_RESPOND_TOOL_NAME} that you are going ask other agents and that it make take some time
+4. Communiucate with the agents determined in step 2.
+5. Summarise information from other agents and provide it to {owner_id} using {THREAD_RESPOND_TOOL_NAME}
+
+# Support tips
+1. If a message looks incomplete, wait for the user to follow-up
+2. Prioritise responding to {owner_id}, other users may send messages in the same support thread
+
+# Discord tips
+1. Some or all of the the user's query may exist as the title of the thread
+2. Markdown and emojis are supported, notifying users can be done with the <@userid> syntax, e.g <@{owner_id}>
+3. The platform and communication on it is generally informal
+
+# Discord thread information
+Title: {}
+Owner: {owner_id}
+"#, channel.name));
 
     // A discord thread is spawned with one message, so take the last message and send it to the
     // message queue so that it is processed as a loop prompt
-    let last_message = existing_messages.pop();
-    let _ = watcher.sender.lock().await.send(last_message
-        .expect("No existing messages found on the created thread"));
+    let last_message = existing_messages.pop()
+        .expect("No existing messages found on the created thread");
+
+    info!("Responding to thread: {}", channel.name);
+    info!("With message body: {}", last_message.content);
+
+    let _ = watcher.sender.lock().await.send(last_message);
 
     // If there are more messages (happens if the support agent joins late or if they are re-added
     // to the thread), attach the messages to the additional_prompting string
     if !existing_messages.is_empty() {
-        additional_prompting.push_str("\n\n=== Previous messages ===\n");
-        additional_prompting.push_str(existing_messages
+        preamble = preamble.string("\n\n# Previous messages\n");
+        preamble = preamble.string(existing_messages
             .iter()
             .rev()
             .flat_map(|x| serde_json::to_string(x))
@@ -151,32 +156,41 @@ async fn main() {
             .as_str());
     }
 
+    // Add coral resources
+    preamble = preamble.all_resources(coral.clone());
+
     let model = GPT_4_1_MINI;
-    let completion_agent = openai::Client::from_env()
+    let completion_agent = openrouter::Client::from_env()
         .agent(model)
         .tool(ThreadRespondTool::new(http.clone(), channel))
-        .preamble(format!("{PROMPT}{additional_prompting}").as_str())
-        .temperature(0.97)
+        .temperature(0.30)
         .max_tokens(512)
         .build();
 
     let agent = Agent::new(completion_agent)
+        .preamble(preamble)
         .telemetry(TelemetryMode::OpenAI, model)
         .mcp_server(coral);
 
     let prompt_stream = stream::unfold(watcher.receiver.clone(), |receiver| async move {
-        let thread_message = receiver.lock().await.recv().await;
-        match thread_message {
-            None => None,
-            Some(message) => {
-                match serde_json::to_string(&message) {
-                    Err(e) => {
-                        error!("Error serialising message: {}", e);
-                        None
-                    },
-                    Ok(data) => Some((data, receiver))
-                }
-            }
+        let mut messages = Vec::new();
+        if receiver.lock().await.recv_many(&mut messages, 16).await == 0 {
+            None
+        }
+        else {
+            info!("Received {} messages", messages.len());
+
+            let prompt = CompletionEvaluatedPrompt::new()
+                .string("[START OF AUTOMATED MESSAGE]")
+                .string(format!("New message data received, respond using {THREAD_RESPOND_TOOL_NAME}:"))
+                .string(messages
+                    .iter()
+                    .flat_map(serde_json::to_string)
+                    .collect::<Vec<_>>()
+                    .join("\n"))
+                .string("[END OF AUTOMATED MESSAGE]");
+
+            Some((prompt, receiver))
         }
     });
 

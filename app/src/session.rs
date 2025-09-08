@@ -1,13 +1,8 @@
 use std::collections::HashMap;
 use coral_rs::api::generated::{Client, Error, ResponseValue};
-use coral_rs::api::generated::types::{AgentGraphRequest, AgentOptionValue, CreateSessionRequest, CreateSessionResponse, GraphAgentProvider, GraphAgentRequest, RouteException, RuntimeId};
+use coral_rs::api::generated::types::{AgentGraphRequest, AgentOptionValue, AgentRegistryIdentifier, GraphAgentProvider, GraphAgentRequest, RouteException, RuntimeId, SessionIdentifier, SessionRequest};
 use humantime::format_duration;
 use crate::Arguments;
-
-struct AgentDefinition {
-    name: String,
-    options: HashMap<String, AgentOptionValue>,
-}
 
 pub struct Session<'a> {
     arguments: &'a Arguments,
@@ -25,68 +20,76 @@ impl<'a> Session<'a> {
         }
     }
 
-    fn agents(&self) -> Vec<AgentDefinition> {
-        let mut discord_options = HashMap::from([
+    fn discord_graph_request(&self) -> GraphAgentRequest {
+        let mut options = HashMap::from([
             ("DISCORD_API_TOKEN".to_string(), AgentOptionValue::String(self.arguments.discord_api_token.clone())),
-            ("OPENAI_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openai_api_key.clone())),
+            ("OPENROUTER_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openrouter_api_key.clone())),
             ("DISCORD_THREAD_ID".to_string(), AgentOptionValue::String(self.channel_id.clone()))
         ]);
 
         if let Some(timeout) = self.arguments.timeout_duration_warning {
-            discord_options.insert("DISCORD_TIMEOUT_WARNING".to_string(),
-                                   AgentOptionValue::String(format_duration(timeout.into()).to_string()));
+            options.insert("DISCORD_TIMEOUT_WARNING".to_string(),
+                           AgentOptionValue::String(format_duration(timeout.into()).to_string()));
         }
 
         if let Some(timeout) = self.arguments.timeout_duration {
-            discord_options.insert("DISCORD_TIMEOUT_WARNING".to_string(),
-                                   AgentOptionValue::String(format_duration(timeout.into()).to_string()));
+            options.insert("DISCORD_TIMEOUT_WARNING".to_string(),
+                           AgentOptionValue::String(format_duration(timeout.into()).to_string()));
         }
 
-        vec![
-            // AgentDefinition {
-            //     name: "context".to_string(),
-            //     options: HashMap::new(),
-            // },
-            AgentDefinition {
+        GraphAgentRequest {
+            blocking: Some(true),
+            custom_tool_access: vec![],
+            description: None,
+            id: AgentRegistryIdentifier {
                 name: "discord".to_string(),
-                options: discord_options,
+                version: "0.1.0".to_string(),
             },
-        ]
+            name: "discord".to_string(),
+            options,
+            provider: GraphAgentProvider::Local {
+                runtime: RuntimeId::Executable,
+            },
+            system_prompt: None,
+        }
     }
 
-    pub async fn execute(&self) -> Result<ResponseValue<CreateSessionResponse>, Error<RouteException>> {
-        let agents = self.agents();
-        Client::new(self.arguments.coral_server.as_str())
-            .create_session(&CreateSessionRequest {
-                agent_graph: Some(AgentGraphRequest {
-                    agents: agents
-                        .iter()
-                        .map(|agent| {
-                            (agent.name.clone(), GraphAgentRequest {
-                                agent_name: agent.name.clone(),
-                                blocking: Some(true),
-                                options: agent.options.clone(),
-                                provider: GraphAgentProvider::Local {
-                                    runtime: RuntimeId::Executable,
-                                },
-                                system_prompt: None,
-                                tools: vec![],
-                            })
-                        })
-                        .collect::<HashMap<String, GraphAgentRequest>>(),
+    fn coral_context_graph_request(&self) -> GraphAgentRequest {
+        GraphAgentRequest {
+            blocking: Some(true),
+            custom_tool_access: vec![],
+            description: Some("An agent with access to all the Coral documentation".to_string()),
+            id: AgentRegistryIdentifier {
+                name: "context7".to_string(),
+                version: "0.1.0".to_string(),
+            },
+            name: "ctx-coral".to_string(),
+            options: HashMap::from([
+                ("ENABLE_TELEMETRY".to_string(), AgentOptionValue::String("true".to_string())),
+                ("LIBRARY_ID".to_string(),  AgentOptionValue::String("websites/coralprotocol".to_string())),
+                ("OPENROUTER_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openrouter_api_key.clone())),
+            ]),
+            provider: GraphAgentProvider::Local {
+                runtime: RuntimeId::Docker,
+            },
+            system_prompt: None,
+        }
+    }
 
-                    // All agents should have access to each other at the moment
-                    links: vec![
-                        agents
-                            .iter()
-                            .map(|agent| agent.name.clone())
-                            .collect()
-                    ],
-                    tools: Default::default(),
-                }),
+    pub async fn execute(&self) -> Result<ResponseValue<SessionIdentifier>, Error<RouteException>> {
+        let coral_ctx = self.coral_context_graph_request();
+        let discord = self.discord_graph_request();
+
+        Client::new(self.arguments.coral_server.as_str())
+            .create_session(&SessionRequest {
+                agent_graph_request: AgentGraphRequest {
+                    groups: vec![vec![coral_ctx.name.clone(), discord.name.clone()]],
+                    agents: vec![coral_ctx, discord],
+                    custom_tools: Default::default(),
+                },
                 application_id: "coral-example-app".to_string(),
-                privacy_key: "private".to_string(),
-                session_id: None
+                privacy_key: "unused".to_string(),
+                session_id: None,
             })
             .await
     }

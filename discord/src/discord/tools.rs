@@ -7,7 +7,7 @@ use rmcp::schemars as schemars;
 use serde::{Deserialize, Serialize};
 use serenity::all::{CreateMessage, GuildChannel, Http, MessageId, Timestamp};
 
-pub const THREAD_RESPOND_T0OL_NAME: &str = "send_discord_message";
+pub const THREAD_RESPOND_TOOL_NAME: &str = "send_discord_message";
 
 pub struct ThreadRespondTool {
     http: Arc<Http>,
@@ -46,7 +46,7 @@ pub struct ThreadRespondToolOutput {
 }
 
 impl Tool for ThreadRespondTool {
-    const NAME: &'static str = THREAD_RESPOND_T0OL_NAME;
+    const NAME: &'static str = THREAD_RESPOND_TOOL_NAME;
     type Error = ResponseError;
     type Args = Args;
     type Output = ThreadRespondToolOutput;

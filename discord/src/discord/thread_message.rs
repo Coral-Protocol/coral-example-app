@@ -8,8 +8,8 @@ use serenity::all::{Message, UserId};
 /// here
 #[derive(Serialize)]
 pub struct ThreadMessage {
-    sender: UserId,
-    content: String
+    pub sender: UserId,
+    pub content: String
 }
 
 impl From<&Message> for ThreadMessage {

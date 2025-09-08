@@ -32,9 +32,9 @@ struct Arguments {
     #[arg(long, env = "DISCORD_TIMEOUT")]
     timeout_duration: Option<humantime::Duration>,
 
-    /// The OpenAI API key
-    #[arg(long, env = "OPENAI_API_KEY")]
-    openai_api_key: String,
+    /// The OpenRouter API key
+    #[arg(long, env = "OPENROUTER_API_KEY")]
+    openrouter_api_key: String,
 }
 
 struct Handler;
