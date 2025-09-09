@@ -11,4 +11,4 @@ DISCORD_TIMEOUT = { type = "string", description = "After the timeout warning ha
 OPENROUTER_API_KEY = { type = "string", description = "An API key for OpenRouter", required = true }
 
 [runtimes.executable]
-command = ["target/release/discord.exe"]
+command = ["target/release/discord"]
