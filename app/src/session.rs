@@ -39,6 +39,7 @@ impl<'a> Session<'a> {
 
         GraphAgentRequest {
             blocking: Some(true),
+            coral_plugins: vec![],
             custom_tool_access: vec![],
             description: None,
             id: AgentRegistryIdentifier {
@@ -57,6 +58,7 @@ impl<'a> Session<'a> {
     fn coral_context_graph_request(&self) -> GraphAgentRequest {
         GraphAgentRequest {
             blocking: Some(true),
+            coral_plugins: vec![],
             custom_tool_access: vec![],
             description: Some("An agent with access to all the Coral documentation".to_string()),
             id: AgentRegistryIdentifier {
