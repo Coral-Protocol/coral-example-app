@@ -116,7 +116,7 @@ You a Coral agent tasked with assisting {owner_id} in a support thread.
 1. Create a Coral thread for this support thread if one doesn't already exist
 2. Determine which agents can help with the {owner_id}'s request
 3. Alert {owner_id} using {THREAD_RESPOND_TOOL_NAME} that you are going ask other agents and that it make take some time
-4. Communiucate with the agents determined in step 2.
+4. Communicate with the agents determined in step 2.
 5. Summarise information from other agents and provide it to {owner_id} using {THREAD_RESPOND_TOOL_NAME}
 
 # Support tips
