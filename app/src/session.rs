@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use coral_rs::api::generated::{Client, Error, ResponseValue};
-use coral_rs::api::generated::types::{AgentGraphRequest, AgentOptionValue, AgentRegistryIdentifier, GraphAgentProvider, GraphAgentRequest, RouteException, RuntimeId, SessionIdentifier, SessionRequest};
+use coral_rs::api::generated::types::{AgentClaimAmount, AgentGraphRequest, AgentOptionValue, AgentRegistryIdentifier, GraphAgentProvider, GraphAgentRequest, GraphAgentServer, GraphAgentServerSource, RouteException, RuntimeId, SessionIdentifier, SessionRequest};
 use humantime::format_duration;
 use crate::Arguments;
 
@@ -55,7 +55,7 @@ impl<'a> Session<'a> {
         }
     }
 
-    fn coral_context_graph_request(&self) -> GraphAgentRequest {
+    fn coral_context_graph_request(&self, remote: bool) -> GraphAgentRequest {
         GraphAgentRequest {
             blocking: Some(true),
             coral_plugins: vec![],
@@ -71,15 +71,34 @@ impl<'a> Session<'a> {
                 ("LIBRARY_ID".to_string(),  AgentOptionValue::String("websites/coralprotocol".to_string())),
                 ("OPENROUTER_API_KEY".to_string(), AgentOptionValue::String(self.arguments.openrouter_api_key.clone())),
             ]),
-            provider: GraphAgentProvider::Local {
-                runtime: RuntimeId::Docker,
+            provider: if remote {
+                GraphAgentProvider::RemoteRequest {
+                    max_cost: AgentClaimAmount::Usd(0.01),
+                    runtime: RuntimeId::Docker,
+                    server_scoring: None,
+                    server_source: GraphAgentServerSource::Servers {
+                        servers: vec![
+                            GraphAgentServer {
+                                address: "agents.coralprotocol.org".to_string(),
+                                attributes: vec![],
+                                port: 443,
+                                secure: true,
+                            }
+                        ],
+                    },
+                }
+            }
+            else {
+                GraphAgentProvider::Local {
+                    runtime: RuntimeId::Docker,
+                }
             },
             system_prompt: None,
         }
     }
 
-    pub async fn execute(&self) -> Result<ResponseValue<SessionIdentifier>, Error<RouteException>> {
-        let coral_ctx = self.coral_context_graph_request();
+    pub async fn execute(&self, remote: bool) -> Result<ResponseValue<SessionIdentifier>, Error<RouteException>> {
+        let coral_ctx = self.coral_context_graph_request(remote);
         let discord = self.discord_graph_request();
 
         Client::new(self.arguments.coral_server.as_str())

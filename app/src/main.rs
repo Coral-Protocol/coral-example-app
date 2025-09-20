@@ -35,6 +35,11 @@ struct Arguments {
     /// The OpenRouter API key
     #[arg(long, env = "OPENROUTER_API_KEY")]
     openrouter_api_key: String,
+
+    /// If this is set, agents.coralprotocol.org will be used to source the context7 agent remotely.
+    /// The local coral server must be set up with a wallet to use this feature
+    #[arg(long)]
+    remote: bool,
 }
 
 struct Handler;
@@ -68,7 +73,7 @@ impl EventHandler for Handler {
             thread.id.to_string()
         );
 
-        match session.execute().await {
+        match session.execute(arguments.remote).await {
             Ok(session) => {
                 info!("Created session {} for thread \"{}\" ({})",
                     session.session_id, thread.name, thread.id);
